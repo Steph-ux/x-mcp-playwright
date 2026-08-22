@@ -25,6 +25,7 @@ import asyncio
 import os
 import re
 import sys
+import time
 import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -245,12 +246,12 @@ class _TokenBucket:
         self._capacity = capacity
         self._rate = rate
         self._tokens = float(capacity)
-        self._last_refill = asyncio.get_event_loop().time()
+        self._last_refill = time.monotonic()
         self._lock = asyncio.Lock()
 
     async def acquire(self) -> bool:
         async with self._lock:
-            now = asyncio.get_event_loop().time()
+            now = time.monotonic()
             elapsed = now - self._last_refill
             self._tokens = min(self._capacity, self._tokens + elapsed * self._rate)
             self._last_refill = now
@@ -261,8 +262,8 @@ class _TokenBucket:
 
     async def wait(self, timeout: float = 30.0) -> bool:
         """Wait up to `timeout` seconds for a token."""
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             if await self.acquire():
                 return True
             await asyncio.sleep(0.5)
